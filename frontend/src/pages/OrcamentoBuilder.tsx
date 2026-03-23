@@ -2,10 +2,11 @@ import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Form, Input, InputNumber, Select, Button, Table, Space, Typography, Card,
-  DatePicker, message, Row, Col, Divider, Popconfirm,
+  DatePicker, message, Row, Col, Divider, Popconfirm, TextArea, Table as AntTable,
 } from 'antd'
 import {
   PlusOutlined, DeleteOutlined, SaveOutlined, ArrowLeftOutlined, SearchOutlined,
+  PrinterOutlined, FileTextOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import api from '../api/client'
@@ -405,55 +406,57 @@ export default function OrcamentoBuilder() {
   ]
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+    <div style={{ padding: '0 12px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <Space>
           <Button icon={<ArrowLeftOutlined />} onClick={() => navigate('/orcamentos')}>
             Voltar
           </Button>
-          <Title level={3} style={{ margin: 0 }}>
-            {isEditing ? `Editar Pedido #${form.getFieldValue('numero') || id}` : 'Novo Orcamento'}
+          <Title level={2} style={{ margin: 0 }}>
+            Orcamento / Pedido
           </Title>
         </Space>
-        <Button type="primary" icon={<SaveOutlined />} onClick={handleSave} loading={saving}>
-          {isEditing ? 'Salvar' : 'Criar Orcamento'}
-        </Button>
       </div>
 
       <Form form={form} layout="vertical" initialValues={{ tipo_documento: 'ORCAMENTO' }}>
+
+        {/* SEÇÃO: DADOS DO PEDIDO */}
         <Card title="Dados do Pedido" size="small" style={{ marginBottom: 16 }}>
-          <Row gutter={16}>
+          <Row gutter={[16, 16]}>
+            {/* Row 1: Numero, Data, Cliente, Vendedor */}
             <Col xs={24} sm={12} md={4}>
               <Form.Item label="Numero" name="numero">
                 <InputNumber style={{ width: '100%' }} disabled={isEditing} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12} md={5}>
-              <Form.Item label="Tipo Documento" name="tipo_documento">
-                <Select options={[
-                  { value: 'ORCAMENTO', label: 'Orcamento' },
-                  { value: 'PEDIDO', label: 'Pedido' },
-                ]} />
+            <Col xs={24} sm={12} md={4}>
+              <Form.Item label="Data" name="data_pedido">
+                <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12} md={7}>
+            <Col xs={24} sm={12} md={8}>
               <Form.Item label="Cliente" name="cliente_id">
                 <Select
                   showSearch
                   allowClear
-                  placeholder="Selecionar cliente"
+                  placeholder="Selecionar cliente..."
                   filterOption={(input, option) =>
                     (option?.label as string || '').toLowerCase().includes(input.toLowerCase())
                   }
                   options={clientes.map(c => ({
                     value: c.id,
-                    label: `${c.nome}${c.cnpj_cpf ? ` (${c.cnpj_cpf})` : ''}`,
+                    label: `${c.id?.toString().padStart(5, '0')} - ${c.nome}`,
                   }))}
                 />
               </Form.Item>
             </Col>
             <Col xs={24} sm={12} md={4}>
-              <Form.Item label="Vendedor" name="vendedor_id">
+              <Button type="default" block>
+                Pesquisar
+              </Button>
+            </Col>
+            <Col xs={24} sm={12} md={4}>
+              <Form.Item label="Vendedor" name="vendedor_id" noStyle>
                 <Select
                   allowClear
                   placeholder="Vendedor"
@@ -461,53 +464,47 @@ export default function OrcamentoBuilder() {
                 />
               </Form.Item>
             </Col>
+
+            {/* Row 2: Tipo Doc, Tipo NF, Saida */}
+            <Col xs={24} sm={12} md={4}>
+              <Form.Item label="Tipo Doc" name="tipo_documento">
+                <Select options={[
+                  { value: 'ORCAMENTO', label: 'Orcamento' },
+                  { value: 'PEDIDO', label: 'Pedido' },
+                ]} />
+              </Form.Item>
+            </Col>
             <Col xs={24} sm={12} md={4}>
               <Form.Item label="Tipo NF" name="tipo_nf">
                 <Select allowClear placeholder="Tipo NF" options={NF_TYPES} />
               </Form.Item>
             </Col>
-          </Row>
-          <Row gutter={16}>
             <Col xs={24} sm={12} md={4}>
               <Form.Item label="Saida" name="origem_frete">
                 <Select allowClear placeholder="Origem" options={SHIPPING_ORIGINS} />
               </Form.Item>
             </Col>
-            <Col xs={24} sm={12} md={5}>
-              <Form.Item label="Forma Pagamento" name="forma_pagamento">
-                <Select allowClear placeholder="Pagamento" options={PAYMENT_METHODS} />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={5}>
-              <Form.Item label="Condicao Pagamento" name="condicao_pagamento">
-                <Input placeholder="Ex: 30/60/90" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={5}>
-              <Form.Item label="Disponibilidade" name="disponibilidade">
-                <Input placeholder="A PRONTA ENTREGA" />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12} md={5}>
-              <Form.Item label="Valor Frete" name="valor_frete">
-                <InputNumber
-                  min={0}
-                  style={{ width: '100%' }}
-                  formatter={(v) => `R$ ${v}`}
-                />
-              </Form.Item>
-            </Col>
+            <Col xs={24} sm={12} md={12} />
           </Row>
         </Card>
 
+        {/* SEÇÃO: ITENS DO PEDIDO */}
         <Card
           title="Itens do Pedido"
           size="small"
           style={{ marginBottom: 16 }}
           extra={
-            <Button type="dashed" icon={<PlusOutlined />} onClick={addItem}>
-              Adicionar Item
-            </Button>
+            <Space>
+              <Button type="dashed" icon={<PlusOutlined />} onClick={addItem} size="small">
+                Adicionar Item
+              </Button>
+              <Button danger icon={<DeleteOutlined />} size="small">
+                Remover Item
+              </Button>
+              <Button icon={<SearchOutlined />} size="small">
+                Pesquisar Produto
+              </Button>
+            </Space>
           }
         >
           <Table
@@ -516,42 +513,105 @@ export default function OrcamentoBuilder() {
             rowKey="key"
             pagination={false}
             size="small"
-            scroll={{ x: 700 }}
+            scroll={{ x: 'max-content' }}
           />
         </Card>
 
+        {/* SEÇÃO: RESUMO */}
         <Card title="Resumo" size="small" style={{ marginBottom: 16 }}>
-          <Row gutter={16}>
-            <Col xs={12} sm={8} md={4}>
-              <Text type="secondary">Subtotal</Text>
-              <div><Text strong>{formatCurrency(totals.subtotal)}</Text></div>
+          <Row gutter={[24, 16]}>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Subtotal</Text>
+              <div><Text strong style={{ fontSize: 14 }}>{formatCurrency(totals.subtotal)}</Text></div>
             </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Text type="secondary">Frete</Text>
-              <div><Text strong>{formatCurrency(totals.frete)}</Text></div>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Desconto Total</Text>
+              <div><Text strong style={{ fontSize: 14 }}>R$ 0,00</Text></div>
             </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Text type="secondary">Total</Text>
-              <div><Text strong style={{ fontSize: 18, color: '#1B5E20' }}>{formatCurrency(totals.total)}</Text></div>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Frete</Text>
+              <div>
+                <Form.Item name="valor_frete" noStyle>
+                  <InputNumber min={0} size="small" style={{ width: 100 }} />
+                </Form.Item>
+              </div>
             </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Text type="secondary">Custo Total</Text>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Total</Text>
+              <div><Text strong style={{ fontSize: 16, color: '#1B5E20' }}>{formatCurrency(totals.total)}</Text></div>
+            </Col>
+
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Valor NF</Text>
+              <div><Text strong>{formatCurrency(totals.total)}</Text></div>
+            </Col>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>DIFAL</Text>
+              <div><Text strong>R$ 0,00</Text></div>
+            </Col>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Custo Total</Text>
               <div><Text>{formatCurrency(totals.custoTotal)}</Text></div>
             </Col>
-            <Col xs={12} sm={8} md={4}>
-              <Text type="secondary">Lucro</Text>
-              <div><Text strong style={{ color: totals.lucro >= 0 ? '#1B5E20' : '#EF5350' }}>
+            <Col xs={12} sm={8} md={6}>
+              <Text type="secondary" style={{ fontSize: 12 }}>Lucro</Text>
+              <div><Text strong style={{ fontSize: 14, color: totals.lucro >= 0 ? '#1B5E20' : '#EF5350' }}>
                 {formatCurrency(totals.lucro)}
               </Text></div>
             </Col>
           </Row>
         </Card>
 
-        <Card title="Observacoes" size="small">
-          <Form.Item name="observacoes" noStyle>
-            <Input.TextArea rows={3} placeholder="Observacoes adicionais..." />
-          </Form.Item>
+        {/* SEÇÃO: CONDICOES */}
+        <Card title="Condicoes" size="small" style={{ marginBottom: 16 }}>
+          <Row gutter={[16, 16]}>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item label="Pagamento" name="forma_pagamento">
+                <Select allowClear placeholder="Pagamento" options={PAYMENT_METHODS} />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item label="Condicoes" name="condicao_pagamento">
+                <Input placeholder="Ex: 30/60/90" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item label="Disponibilidade" name="disponibilidade">
+                <Input placeholder="A PRONTA ENTREGA" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} sm={12} md={6}>
+              <Form.Item label="Observacoes" name="observacoes" style={{ marginBottom: 0 }}>
+                <Input.TextArea rows={2} placeholder="Observacoes..." />
+              </Form.Item>
+            </Col>
+          </Row>
         </Card>
+
+        {/* BOTÕES DE AÇÃO */}
+        <Space style={{ marginBottom: 20 }} wrap>
+          <Button
+            type="primary"
+            icon={<SaveOutlined />}
+            onClick={handleSave}
+            loading={saving}
+            style={{ backgroundColor: '#1e8449', borderColor: '#1e8449', minWidth: 100 }}
+          >
+            Salvar
+          </Button>
+          <Button
+            icon={<FileTextOutlined />}
+            style={{ backgroundColor: '#1a6ea8', color: 'white', borderColor: '#1a6ea8', minWidth: 100 }}
+          >
+            Gerar PDF
+          </Button>
+          <Button
+            onClick={() => navigate('/orcamentos')}
+            style={{ backgroundColor: '#7f8c8d', color: 'white', borderColor: '#7f8c8d', minWidth: 100 }}
+          >
+            Cancelar
+          </Button>
+        </Space>
       </Form>
     </div>
   )
